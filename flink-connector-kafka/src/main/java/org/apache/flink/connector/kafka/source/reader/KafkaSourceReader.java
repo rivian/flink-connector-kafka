@@ -38,7 +38,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -133,9 +132,13 @@ public class KafkaSourceReader<T>
         Map<TopicPartition, OffsetAndMetadata> committedPartitions =
                 offsetsToCommit.get(checkpointId);
         if (committedPartitions == null) {
-            LOG.debug(
-                    "Offsets for checkpoint {} either do not exist or have already been committed.",
-                    checkpointId);
+            LOG.debug("Offsets for checkpoint {} have already been committed.", checkpointId);
+            return;
+        }
+
+        if (committedPartitions.isEmpty()) {
+            LOG.debug("There are no offsets to commit for checkpoint {}.", checkpointId);
+            removeAllOffsetsToCommitUpToCheckpoint(checkpointId);
             return;
         }
 
@@ -168,12 +171,15 @@ public class KafkaSourceReader<T>
                                                 entry ->
                                                         committedPartitions.containsKey(
                                                                 entry.getKey()));
-                                while (!offsetsToCommit.isEmpty()
-                                        && offsetsToCommit.firstKey() <= checkpointId) {
-                                    offsetsToCommit.remove(offsetsToCommit.firstKey());
-                                }
+                                removeAllOffsetsToCommitUpToCheckpoint(checkpointId);
                             }
                         });
+    }
+
+    private void removeAllOffsetsToCommitUpToCheckpoint(long checkpointId) {
+        while (!offsetsToCommit.isEmpty() && offsetsToCommit.firstKey() <= checkpointId) {
+            offsetsToCommit.remove(offsetsToCommit.firstKey());
+        }
     }
 
     @Override
@@ -184,12 +190,6 @@ public class KafkaSourceReader<T>
     @Override
     protected KafkaPartitionSplit toSplitType(String splitId, KafkaPartitionSplitState splitState) {
         return splitState.toKafkaPartitionSplit();
-    }
-
-    @Override
-    public void pauseOrResumeSplits(
-            Collection<String> splitsToPause, Collection<String> splitsToResume) {
-        splitFetcherManager.pauseOrResumeSplits(splitsToPause, splitsToResume);
     }
 
     // ------------------------

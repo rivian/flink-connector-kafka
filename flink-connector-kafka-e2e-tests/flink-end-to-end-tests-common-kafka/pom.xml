@@ -23,7 +23,7 @@ under the License.
     <parent>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-connector-kafka-e2e-tests</artifactId>
-        <version>3.1-SNAPSHOT</version>
+        <version>3.2.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -67,6 +67,12 @@ under the License.
                 </exclusion>
             </exclusions>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-base</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -91,7 +97,7 @@ under the License.
             <!-- Used by maven-dependency-plugin -->
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-sql-avro-confluent-registry</artifactId>
-            <version>${project.version}</version>
+            <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -106,6 +112,12 @@ under the License.
             <artifactId>kafka-avro-serializer</artifactId>
             <version>${confluent.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -118,6 +130,10 @@ under the License.
                     <groupId>org.apache.kafka</groupId>
                     <artifactId>kafka-clients</artifactId>
                 </exclusion>
+                    <exclusion>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                    </exclusion>
             </exclusions>
         </dependency>
 
@@ -155,7 +171,7 @@ under the License.
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>30.1.1-jre</version>
+			<version>32.1.2-jre</version>
 		</dependency>
     </dependencies>
 
@@ -194,7 +210,7 @@ under the License.
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-sql-avro-confluent-registry</artifactId>
-                            <version>${project.version}</version>
+                            <version>${flink.version}</version>
                             <destFileName>avro-confluent.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
@@ -234,7 +250,7 @@ under the License.
 						<artifactItem>
 							<groupId>com.google.guava</groupId>
 							<artifactId>guava</artifactId>
-							<version>30.1.1-jre</version>
+							<version>32.1.2-jre</version>
 							<destFileName>guava.jar</destFileName>
 							<type>jar</type>
 							<outputDirectory>${project.build.directory}/dependencies</outputDirectory>

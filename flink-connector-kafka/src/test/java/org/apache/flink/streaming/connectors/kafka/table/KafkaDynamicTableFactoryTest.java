@@ -74,8 +74,6 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.TestLoggerExtension;
 
-import org.apache.flink.shaded.guava30.com.google.common.collect.ImmutableList;
-
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.TopicPartition;
@@ -479,13 +477,17 @@ public class KafkaDynamicTableFactoryTest {
                     OffsetsInitializer offsetsInitializer =
                             KafkaSourceTestUtils.getStoppingOffsetsInitializer(source);
                     TopicPartition partition = new TopicPartition(TOPIC, 0);
+                    long endOffsets = 123L;
                     Map<TopicPartition, Long> partitionOffsets =
                             offsetsInitializer.getPartitionOffsets(
                                     Collections.singletonList(partition),
-                                    MockPartitionOffsetsRetriever.noInteractions());
+                                    MockPartitionOffsetsRetriever.latest(
+                                            (tps) ->
+                                                    Collections.singletonMap(
+                                                            partition, endOffsets)));
                     assertThat(partitionOffsets)
                             .containsOnlyKeys(partition)
-                            .containsEntry(partition, KafkaPartitionSplit.LATEST_OFFSET);
+                            .containsEntry(partition, endOffsets);
                 });
     }
 
@@ -618,7 +620,7 @@ public class KafkaDynamicTableFactoryTest {
 
     @Test
     public void testTableSinkSemanticTranslation() {
-        final List<String> semantics = ImmutableList.of("exactly-once", "at-least-once", "none");
+        final List<String> semantics = Arrays.asList("exactly-once", "at-least-once", "none");
         final EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat =
                 new EncodingFormatMock(",");
         for (final String semantic : semantics) {
@@ -866,7 +868,7 @@ public class KafkaDynamicTableFactoryTest {
 
     private SerializationSchema<RowData> createDebeziumAvroSerSchema(
             RowType rowType, String subject) {
-        return new DebeziumAvroSerializationSchema(rowType, TEST_REGISTRY_URL, subject, null, null);
+        return new DebeziumAvroSerializationSchema(rowType, TEST_REGISTRY_URL, subject, null);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -1093,6 +1095,82 @@ public class KafkaDynamicTableFactoryTest {
                         "The Kafka table 'default.default.t1' with 'test-format' format"
                                 + " doesn't support defining PRIMARY KEY constraint on the table, because it can't"
                                 + " guarantee the semantic of primary key.");
+    }
+
+    @Test
+    public void testDiscoverPartitionByDefault() {
+        Map<String, String> tableSourceOptions =
+                getModifiedOptions(
+                        getBasicSourceOptions(),
+                        options -> options.remove("scan.topic-partition-discovery.interval"));
+        final KafkaDynamicSource actualSource =
+                (KafkaDynamicSource) createTableSource(SCHEMA, tableSourceOptions);
+        Properties props = new Properties();
+        props.putAll(KAFKA_SOURCE_PROPERTIES);
+        // The default partition discovery interval is 5 minutes
+        props.setProperty("partition.discovery.interval.ms", "300000");
+        final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
+        specificOffsets.put(new KafkaTopicPartition(TOPIC, PARTITION_0), OFFSET_0);
+        specificOffsets.put(new KafkaTopicPartition(TOPIC, PARTITION_1), OFFSET_1);
+        final DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat =
+                new DecodingFormatMock(",", true);
+        // Test scan source equals
+        final KafkaDynamicSource expectedKafkaSource =
+                createExpectedScanSource(
+                        SCHEMA_DATA_TYPE,
+                        null,
+                        valueDecodingFormat,
+                        new int[0],
+                        new int[] {0, 1, 2},
+                        null,
+                        Collections.singletonList(TOPIC),
+                        null,
+                        props,
+                        StartupMode.SPECIFIC_OFFSETS,
+                        specificOffsets,
+                        0);
+        assertThat(actualSource).isEqualTo(expectedKafkaSource);
+        ScanTableSource.ScanRuntimeProvider provider =
+                actualSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        assertKafkaSource(provider);
+    }
+
+    @Test
+    public void testDisableDiscoverPartition() {
+        Map<String, String> tableSourceOptions =
+                getModifiedOptions(
+                        getBasicSourceOptions(),
+                        options -> options.put("scan.topic-partition-discovery.interval", "0"));
+        final KafkaDynamicSource actualSource =
+                (KafkaDynamicSource) createTableSource(SCHEMA, tableSourceOptions);
+        Properties props = new Properties();
+        props.putAll(KAFKA_SOURCE_PROPERTIES);
+        // Disable discovery if the partition discovery interval is 0 minutes
+        props.setProperty("partition.discovery.interval.ms", "0");
+        final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
+        specificOffsets.put(new KafkaTopicPartition(TOPIC, PARTITION_0), OFFSET_0);
+        specificOffsets.put(new KafkaTopicPartition(TOPIC, PARTITION_1), OFFSET_1);
+        final DecodingFormat<DeserializationSchema<RowData>> valueDecodingFormat =
+                new DecodingFormatMock(",", true);
+        // Test scan source equals
+        final KafkaDynamicSource expectedKafkaSource =
+                createExpectedScanSource(
+                        SCHEMA_DATA_TYPE,
+                        null,
+                        valueDecodingFormat,
+                        new int[0],
+                        new int[] {0, 1, 2},
+                        null,
+                        Collections.singletonList(TOPIC),
+                        null,
+                        props,
+                        StartupMode.SPECIFIC_OFFSETS,
+                        specificOffsets,
+                        0);
+        assertThat(actualSource).isEqualTo(expectedKafkaSource);
+        ScanTableSource.ScanRuntimeProvider provider =
+                actualSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        assertKafkaSource(provider);
     }
 
     // --------------------------------------------------------------------------------------------

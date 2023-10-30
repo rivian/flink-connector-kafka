@@ -50,7 +50,7 @@ CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   'topic' = 'user_behavior',
@@ -129,7 +129,7 @@ The extended `CREATE TABLE` example demonstrates the syntax for exposing these m
 
 ```sql
 CREATE TABLE KafkaTable (
-  `event_time` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `event_time` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `partition` BIGINT METADATA VIRTUAL,
   `offset` BIGINT METADATA VIRTUAL,
   `user_id` BIGINT,
@@ -154,7 +154,7 @@ The following example shows how to access both Kafka and Debezium metadata field
 
 ```sql
 CREATE TABLE KafkaTable (
-  `event_time` TIMESTAMP(3) METADATA FROM 'value.source.timestamp' VIRTUAL,  -- from Debezium format
+  `event_time` TIMESTAMP_LTZ(3) METADATA FROM 'value.source.timestamp' VIRTUAL,  -- from Debezium format
   `origin_table` STRING METADATA FROM 'value.source.table' VIRTUAL, -- from Debezium format
   `partition_id` BIGINT METADATA FROM 'partition' VIRTUAL,  -- from Kafka connector
   `offset` BIGINT METADATA VIRTUAL,  -- from Kafka connector
@@ -364,9 +364,9 @@ Connector Options
       <td><h5>scan.topic-partition-discovery.interval</h5></td>
       <td>optional</td>
       <td>yes</td>
-      <td style="word-wrap: break-word;">(none)</td>
+      <td style="word-wrap: break-word;">5 minutes</td>
       <td>Duration</td>
-      <td>Interval for consumer to discover dynamically created Kafka topics and partitions periodically.</td>
+      <td>Interval for consumer to discover dynamically created Kafka topics and partitions periodically. To disable this feature, you need to explicitly set the 'scan.topic-partition-discovery.interval' value to 0.</td>
     </tr>
     <tr>
       <td><h5>sink.partitioner</h5></td>
@@ -435,7 +435,7 @@ options are prefixed with the format identifier.
 
 ```sql
 CREATE TABLE KafkaTable (
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING
@@ -461,7 +461,7 @@ prefixed with either the `'key'` or `'value'` plus format identifier.
 
 ```sql
 CREATE TABLE KafkaTable (
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING
@@ -608,8 +608,8 @@ Besides enabling Flink's checkpointing, you can also choose three different mode
  * `none`: Flink will not guarantee anything. Produced records can be lost or they can be duplicated.
  * `at-least-once` (default setting): This guarantees that no records will be lost (although they can be duplicated).
  * `exactly-once`: Kafka transactions will be used to provide exactly-once semantic. Whenever you write
- to Kafka using transactions, do not forget about setting desired `isolation.level` (`read_committed`
- or `read_uncommitted` - the latter one is the default value) for any application consuming records
+ to Kafka using transactions, do not forget about setting desired `isolation.level` (`read_uncommitted`
+ or `read_committed` - the latter one is the default value) for any application consuming records
  from Kafka.
 
 Please refer to [Kafka documentation]({{< ref "docs/connectors/datastream/kafka" >}}#kafka-producers-and-fault-tolerance) for more caveats about delivery guarantees.
@@ -629,13 +629,13 @@ for more details.
 ### Security
 In order to enable security configurations including encryption and authentication, you just need to setup security
 configurations with "properties." prefix in table options. The code snippet below shows configuring Kafka table to
-use PLAIN as SASL mechanism and provide JAAS configuration:
+use PLAIN as SASL mechanism and provide JAAS configuration when using SQL client JAR :
 ```sql
 CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   ...
@@ -644,13 +644,13 @@ CREATE TABLE KafkaTable (
   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"username\" password=\"password\";'
 )
 ```
-For a more complex example, use SASL_SSL as the security protocol and use SCRAM-SHA-256 as SASL mechanism:
+For a more complex example, use SASL_SSL as the security protocol and use SCRAM-SHA-256 as SASL mechanism when using SQL client JAR :
 ```sql
 CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   ...
@@ -672,8 +672,9 @@ CREATE TABLE KafkaTable (
 
 Please note that the class path of the login module in `sasl.jaas.config` might be different if you relocate Kafka
 client dependencies, so you may need to rewrite it with the actual class path of the module in the JAR.
-For example if you are using SQL client JAR, which has relocate Kafka client dependencies to `org.apache.flink.kafka.shaded.org.apache.kafka`,
-the path of plain login module should be `org.apache.flink.kafka.shaded.org.apache.kafka.common.security.plain.PlainLoginModule` instead.
+SQL client JAR has relocated Kafka client dependencies to `org.apache.flink.kafka.shaded.org.apache.kafka`,
+then the path of plain login module in code snippets above need to be
+`org.apache.flink.kafka.shaded.org.apache.kafka.common.security.plain.PlainLoginModule` when using SQL client JAR.
 
 For detailed explanations of security configurations, please refer to
 <a href="https://kafka.apache.org/documentation/#security">the "Security" section in Apache Kafka documentation</a>.

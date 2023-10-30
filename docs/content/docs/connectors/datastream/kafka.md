@@ -245,7 +245,7 @@ it is configured:
 ### Dynamic Partition Discovery
 In order to handle scenarios like topic scaling-out or topic creation without restarting the Flink
 job, Kafka source can be configured to periodically discover new partitions under provided 
-topic-partition subscribing pattern. To enable partition discovery, set a non-negative value for 
+topic-partition subscribing pattern. To enable partition discovery, set a positive value for 
 property ```partition.discovery.interval.ms```:
 
 {{< tabs "KafkaSource#PartitionDiscovery" >}}
@@ -264,8 +264,7 @@ KafkaSource.builder() \
 {{< /tabs >}}
 
 {{< hint warning >}}
-Partition discovery is **disabled** by default. You need to explicitly set the partition discovery
-interval to enable this feature.
+The partition discovery interval is 5 minutes by default. To **disable** this feature, you need to explicitly set the partition discovery interval to a non-positive value.
 {{< /hint >}}
 
 ### Event Time and Watermarks
@@ -465,6 +464,25 @@ client dependencies in the job JAR, so you may need to rewrite it with the actua
 
 For detailed explanations of security configurations, please refer to
 <a href="https://kafka.apache.org/documentation/#security">the "Security" section in Apache Kafka documentation</a>.
+
+## Kafka Rack Awareness
+
+Kafka rack awareness allows Flink to select and control the cloud region and availability zone that Kafka consumers read from, based on the Rack ID. This feature reduces network costs and latency since it allows consumers to connect to the closest Kafka brokers, possibly colocated in the same cloud region and availability zone.
+A client's rack is indicated using the `client.rack` config, and should correspond to a broker's `broker.rack` config.
+
+https://kafka.apache.org/documentation/#consumerconfigs_client.rack
+
+### RackId
+
+setRackIdSupplier() is the Builder method allows us to determine the consumer's rack. If provided, the Supplier will be run when the consumer is set up on the Task Manager, and the consumer's `client.rack` configuration will be set to the value.
+
+One of the ways this can be implemented is by making setRackId equal to an environment variable within your taskManager, for instance:
+
+```
+.setRackIdSupplier(() -> System.getenv("TM_NODE_AZ"))
+```
+
+The "TM_NODE_AZ" is the name of the environment variable in the TaskManager container that contains the zone we want to use.
 
 ### Behind the Scene
 {{< hint info >}}

@@ -48,7 +48,7 @@ CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   'topic' = 'user_behavior',
@@ -127,7 +127,7 @@ CREATE TABLE KafkaTable (
 
 ```sql
 CREATE TABLE KafkaTable (
-  `event_time` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `event_time` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `partition` BIGINT METADATA VIRTUAL,
   `offset` BIGINT METADATA VIRTUAL,
   `user_id` BIGINT,
@@ -151,7 +151,7 @@ CREATE TABLE KafkaTable (
 
 ```sql
 CREATE TABLE KafkaTable (
-  `event_time` TIMESTAMP(3) METADATA FROM 'value.source.timestamp' VIRTUAL,  -- from Debezium format
+  `event_time` TIMESTAMP_LTZ(3) METADATA FROM 'value.source.timestamp' VIRTUAL,  -- from Debezium format
   `origin_table` STRING METADATA FROM 'value.source.table' VIRTUAL, -- from Debezium format
   `partition_id` BIGINT METADATA FROM 'partition' VIRTUAL,  -- from Kafka connector
   `offset` BIGINT METADATA VIRTUAL,  -- from Kafka connector
@@ -338,9 +338,9 @@ CREATE TABLE KafkaTable (
     <tr>
       <td><h5>scan.topic-partition-discovery.interval</h5></td>
       <td>可选</td>
-      <td style="word-wrap: break-word;">（无）</td>
+      <td style="word-wrap: break-word;">5分钟</td>
       <td>Duration</td>
-      <td>Consumer 定期探测动态创建的 Kafka topic 和 partition 的时间间隔。</td>
+      <td>Consumer 定期探测动态创建的 Kafka topic 和 partition 的时间间隔。需要显式地设置'scan.topic-partition-discovery.interval'为0才能关闭此功能</td>
     </tr>
     <tr>
       <td><h5>sink.partitioner</h5></td>
@@ -389,7 +389,7 @@ Kafka 消息的消息键和消息体部分都可以使用某种 [格式]({{< ref
 
 ```sql
 CREATE TABLE KafkaTable (
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING
@@ -415,7 +415,7 @@ ROW<`user_id` BIGINT, `item_id` BIGINT, `behavior` STRING>
 
 ```sql
 CREATE TABLE KafkaTable (
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp',
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING
@@ -572,29 +572,29 @@ Source 输出的 watermark 由读取的分区中最小的 watermark 决定。
 请参阅 [Kafka watermark 策略]({{< ref "docs/dev/datastream/event-time/generating_watermarks" >}}#watermark-策略和-kafka-连接器) 以获取更多细节。
 
 ### 安全
-要启用加密和认证相关的安全配置，只需将安全配置加上 "properties." 前缀配置在 Kafka 表上即可。下面的代码片段展示了如何配置 Kafka 表以使用
-PLAIN 作为 SASL 机制并提供 JAAS 配置：
+要启用加密和认证相关的安全配置，只需将安全配置加上 "properties." 前缀配置在 Kafka 表上即可。下面的代码片段展示了当依赖 SQL client JAR 时， 如何配置 Kafka 表
+以使用 PLAIN 作为 SASL 机制并提供 JAAS 配置：
 ```sql
 CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   ...
   'properties.security.protocol' = 'SASL_PLAINTEXT',
   'properties.sasl.mechanism' = 'PLAIN',
-  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"username\" password=\"password\";'
+  'properties.sasl.jaas.config' = 'org.apache.flink.kafka.shaded.org.apache.kafka.common.security.plain.PlainLoginModule required username=\"username\" password=\"password\";'
 )
 ```
-另一个更复杂的例子，使用 SASL_SSL 作为安全协议并使用 SCRAM-SHA-256 作为 SASL 机制：
+另一个更复杂的例子，当依赖 SQL client JAR 时，使用 SASL_SSL 作为安全协议并使用 SCRAM-SHA-256 作为 SASL 机制：
 ```sql
 CREATE TABLE KafkaTable (
   `user_id` BIGINT,
   `item_id` BIGINT,
   `behavior` STRING,
-  `ts` TIMESTAMP(3) METADATA FROM 'timestamp'
+  `ts` TIMESTAMP_LTZ(3) METADATA FROM 'timestamp'
 ) WITH (
   'connector' = 'kafka',
   ...
@@ -610,13 +610,13 @@ CREATE TABLE KafkaTable (
   /* 将 SASL 机制配置为 as SCRAM-SHA-256 */
   'properties.sasl.mechanism' = 'SCRAM-SHA-256',
   /* 配置 JAAS */
-  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.scram.ScramLoginModule required username=\"username\" password=\"password\";'
+  'properties.sasl.jaas.config' = 'org.apache.flink.kafka.shaded.org.apache.kafka.common.security.scram.ScramLoginModule required username=\"username\" password=\"password\";'
 )
 ```
 
-如果在作业 JAR 中 Kafka 客户端依赖的类路径被重置了（relocate class），登录模块（login module）的类路径可能会不同，因此请根据登录模块在
-JAR 中实际的类路径来改写以上配置。例如在 SQL client JAR 中，Kafka client 依赖被重置在了 `org.apache.flink.kafka.shaded.org.apache.kafka` 路径下，
-因此 plain 登录模块的类路径应写为 `org.apache.flink.kafka.shaded.org.apache.kafka.common.security.plain.PlainLoginModule`。
+在作业 JAR 中 Kafka 客户端依赖的类路径被重置了（relocate class），登录模块（login module）的类路径可能会不同，因此需要根据登录模块在
+JAR 中实际的类路径来改写以上配置。在 SQL client JAR 中，Kafka client 依赖被重置在了 `org.apache.flink.kafka.shaded.org.apache.kafka`
+路径下，因此以上的代码片段中 plain 登录模块的类路径写为 `org.apache.flink.kafka.shaded.org.apache.kafka.common.security.plain.PlainLoginModule`。
 
 关于安全配置的详细描述，请参阅 <a href="https://kafka.apache.org/documentation/#security">Apache Kafka 文档中的"安全"一节</a>。
 

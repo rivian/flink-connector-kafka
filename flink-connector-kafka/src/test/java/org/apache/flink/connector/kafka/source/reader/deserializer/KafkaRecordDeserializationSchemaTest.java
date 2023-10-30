@@ -18,18 +18,16 @@
 
 package org.apache.flink.connector.kafka.source.reader.deserializer;
 
+import org.apache.flink.connector.kafka.util.JacksonMapperFactory;
 import org.apache.flink.connector.testutils.formats.DummyInitializationContext;
 import org.apache.flink.connector.testutils.source.deserialization.TestingDeserializationContext;
 import org.apache.flink.formats.json.JsonDeserializationSchema;
 import org.apache.flink.streaming.util.serialization.JSONKeyValueDeserializationSchema;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.jackson.JacksonMapperFactory;
 
-import org.apache.flink.shaded.guava30.com.google.common.collect.ImmutableMap;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -38,6 +36,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,16 +81,24 @@ public class KafkaRecordDeserializationSchemaTest {
     @Test
     public void testKafkaValueDeserializationSchemaWrapper() throws Exception {
         final ConsumerRecord<byte[], byte[]> consumerRecord = getConsumerRecord();
-        KafkaRecordDeserializationSchema<ObjectNode> schema =
-                KafkaRecordDeserializationSchema.valueOnly(
-                        new JsonDeserializationSchema<>(ObjectNode.class));
+        KafkaRecordDeserializationSchema<
+                        org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node
+                                .ObjectNode>
+                schema =
+                        KafkaRecordDeserializationSchema.valueOnly(
+                                new JsonDeserializationSchema<>(
+                                        org.apache.flink.shaded.jackson2.com.fasterxml.jackson
+                                                .databind.node.ObjectNode.class));
         schema.open(new DummyInitializationContext());
-        SimpleCollector<ObjectNode> collector = new SimpleCollector<>();
+        SimpleCollector<
+                        org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node
+                                .ObjectNode>
+                collector = new SimpleCollector<>();
         schema.deserialize(consumerRecord, collector);
 
         assertThat(collector.list).hasSize(1);
-        ObjectNode deserializedValue = collector.list.get(0);
-
+        org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode
+                deserializedValue = collector.list.get(0);
         assertThat(deserializedValue.get("word").asText()).isEqualTo("world");
         assertThat(deserializedValue.get("key")).isNull();
         assertThat(deserializedValue.get("metadata")).isNull();
@@ -116,7 +123,7 @@ public class KafkaRecordDeserializationSchemaTest {
 
     @Test
     public void testKafkaValueDeserializerWrapperWithoutConfigurable() throws Exception {
-        final Map<String, String> config = ImmutableMap.of("simpleKey", "simpleValue");
+        final Map<String, String> config = Collections.singletonMap("simpleKey", "simpleValue");
         KafkaRecordDeserializationSchema<String> schema =
                 KafkaRecordDeserializationSchema.valueOnly(SimpleStringSerializer.class, config);
         schema.open(new TestingDeserializationContext());
@@ -127,7 +134,7 @@ public class KafkaRecordDeserializationSchemaTest {
 
     @Test
     public void testKafkaValueDeserializerWrapperWithConfigurable() throws Exception {
-        final Map<String, String> config = ImmutableMap.of("configKey", "configValue");
+        final Map<String, String> config = Collections.singletonMap("configKey", "configValue");
         KafkaRecordDeserializationSchema<String> schema =
                 KafkaRecordDeserializationSchema.valueOnly(
                         ConfigurableStringSerializer.class, config);
